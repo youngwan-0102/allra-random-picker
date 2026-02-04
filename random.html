@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎲 그룹 랜덤 뽑기</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;600;700;900&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08080c;
+    --surface: #111118;
+    --surface-2: #16161f;
+    --surface-hover: #1c1c2a;
+    --border: #222235;
+    --border-light: #2a2a42;
+    --text: #e4e4ef;
+    --text-dim: #6e6e8a;
+    --text-muted: #44445a;
+    --accent: #7c6aef;
+    --accent-light: #9585f5;
+    --accent-glow: rgba(124,106,239,0.25);
+    --accent-glow-strong: rgba(124,106,239,0.5);
+    --success: #22d3a7;
+    --danger: #ef6a6a;
+    --warning: #f0b429;
+    --gold: #ffd166;
+    --pink: #f472b6;
+    --cyan: #22d3ee;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --transition: 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    background-image: linear-gradient(160deg, #08080c 0%, #0d0d18 50%, #0a0f1a 100%);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content:''; position:fixed; top:-30%; left:-10%; width:60%; height:60%;
+    background: radial-gradient(circle, rgba(124,106,239,0.04) 0%, transparent 70%);
+    pointer-events:none;
+  }
+  #confettiCanvas {
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    pointer-events:none; z-index:9999;
+  }
+  .app {
+    position:relative; z-index:1;
+    max-width:900px; margin:0 auto; padding:28px 20px 60px;
+  }
+
+  /* Header */
+  .header { text-align:center; margin-bottom:32px; padding-top:8px; }
+  .header-icon {
+    font-size:44px; margin-bottom:8px; display:inline-block;
+    animation: floatIcon 3s ease-in-out infinite;
+  }
+  @keyframes floatIcon {
+    0%,100% { transform:translateY(0) rotate(0deg); }
+    50% { transform:translateY(-6px) rotate(5deg); }
+  }
+  .header h1 {
+    font-family:'Outfit',sans-serif; font-size:32px; font-weight:800;
+    background: linear-gradient(135deg, var(--accent-light), var(--success), var(--cyan));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .header p { color:var(--text-dim); font-size:14px; margin-top:6px; font-weight:300; }
+
+  /* Section Title */
+  .section-title {
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+    font-size:14px; font-weight:700; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:1.2px;
+  }
+  .section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* Group Creator */
+  .group-creator { display:flex; gap:10px; margin-bottom:24px; }
+  .group-creator input {
+    flex:1; padding:14px 18px; border-radius:var(--radius-sm);
+    border:1px solid var(--border); background:var(--surface);
+    color:var(--text); font-family:inherit; font-size:14px; outline:none;
+    transition:var(--transition);
+  }
+  .group-creator input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
+  .group-creator input::placeholder { color:var(--text-muted); }
+
+  /* Buttons */
+  .btn {
+    padding:14px 24px; border-radius:var(--radius-sm); border:none;
+    font-family:inherit; font-size:14px; font-weight:700;
+    cursor:pointer; transition:all var(--transition); white-space:nowrap;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:active { transform:scale(0.96); }
+  .btn-primary {
+    background:var(--accent); color:white; box-shadow:0 2px 12px var(--accent-glow);
+  }
+  .btn-primary:hover { background:var(--accent-light); box-shadow:0 4px 20px var(--accent-glow-strong); transform:translateY(-1px); }
+  .btn-secondary {
+    background:transparent; color:var(--text-dim); border:1px solid var(--border);
+  }
+  .btn-secondary:hover { color:var(--text); background:var(--surface-2); border-color:var(--border-light); }
+  .btn-danger-ghost {
+    background:transparent; color:var(--text-muted); border:1px solid transparent;
+    padding:8px 12px; font-size:13px;
+  }
+  .btn-danger-ghost:hover { color:var(--danger); background:rgba(239,106,106,0.08); }
+
+  /* Groups Grid */
+  .groups-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr));
+    gap:16px; margin-bottom:28px;
+  }
+  .empty-state {
+    grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--text-dim);
+  }
+  .empty-state .icon { font-size:48px; margin-bottom:12px; opacity:0.6; }
+  .empty-state .title { font-size:16px; font-weight:600; margin-bottom:6px; }
+  .empty-state .sub { font-size:13px; color:var(--text-muted); }
+
+  /* Group Card */
+  .group-card {
+    background:var(--surface); border-radius:var(--radius);
+    border:1px solid var(--border); overflow:hidden;
+    transition:all 0.3s; animation:cardIn 0.35s cubic-bezier(0.16,1,0.3,1);
+  }
+  .group-card:hover { border-color:var(--border-light); box-shadow:0 2px 20px rgba(0,0,0,0.4); }
+  @keyframes cardIn {
+    from { opacity:0; transform:translateY(16px) scale(0.97); }
+    to { opacity:1; transform:translateY(0) scale(1); }
+  }
+  .group-header {
+    padding:16px 18px 12px; display:flex; align-items:center; gap:12px;
+    border-bottom:1px solid var(--border);
+  }
+  .group-color { width:14px; height:14px; border-radius:5px; flex-shrink:0; }
+  .group-name { flex:1; font-size:16px; font-weight:700; }
+  .group-member-count {
+    font-size:12px; color:var(--text-dim); background:var(--surface-2);
+    padding:4px 10px; border-radius:20px; font-weight:600;
+  }
+  .group-delete {
+    width:30px; height:30px; border-radius:8px; border:none;
+    background:transparent; color:var(--text-muted); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; transition:var(--transition);
+  }
+  .group-delete:hover { background:rgba(239,106,106,0.1); color:var(--danger); }
+
+  .group-body { padding:14px 18px; }
+  .member-input-row { display:flex; gap:8px; margin-bottom:10px; }
+  .member-input-row input {
+    flex:1; padding:10px 14px; border-radius:8px;
+    border:1px solid var(--border); background:var(--bg);
+    color:var(--text); font-family:inherit; font-size:13px;
+    outline:none; transition:var(--transition);
+  }
+  .member-input-row input:focus { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-glow); }
+  .member-input-row input::placeholder { color:var(--text-muted); }
+  .btn-add-member {
+    padding:10px 16px; border-radius:8px; border:none;
+    background:var(--accent); color:white; font-family:inherit;
+    font-size:13px; font-weight:700; cursor:pointer; transition:var(--transition);
+  }
+  .btn-add-member:hover { background:var(--accent-light); }
+  .btn-add-member:active { transform:scale(0.95); }
+
+  .quick-add-row { display:flex; gap:6px; margin-bottom:12px; }
+  .quick-add-btn {
+    padding:5px 10px; border-radius:6px; border:1px dashed var(--border);
+    background:transparent; color:var(--text-muted); font-family:inherit;
+    font-size:11px; cursor:pointer; transition:var(--transition);
+  }
+  .quick-add-btn:hover { border-color:var(--accent); color:var(--accent); border-style:solid; }
+
+  .members-list { display:flex; flex-wrap:wrap; gap:6px; min-height:32px; }
+  .member-chip {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 12px; border-radius:20px; font-size:13px; font-weight:600;
+    animation:chipIn 0.25s cubic-bezier(0.34,1.56,0.64,1); transition:var(--transition);
+  }
+  @keyframes chipIn { from{opacity:0;transform:scale(0.7)} to{opacity:1;transform:scale(1)} }
+  .member-chip .remove {
+    width:18px; height:18px; border-radius:50%; border:none;
+    background:transparent; color:inherit; opacity:0.5; cursor:pointer;
+    font-size:14px; display:flex; align-items:center; justify-content:center;
+    transition:var(--transition);
+  }
+  .member-chip .remove:hover { opacity:1; background:rgba(239,106,106,0.2); color:var(--danger); }
+  .members-empty { font-size:12px; color:var(--text-muted); padding:8px 0; font-style:italic; }
+
+  .group-footer {
+    padding:12px 18px; border-top:1px solid var(--border);
+    display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.15);
+  }
+  .group-footer label { font-size:13px; color:var(--text-dim); font-weight:600; }
+  .group-footer input[type="number"] {
+    width:56px; padding:8px 6px; border-radius:8px;
+    border:1px solid var(--border); background:var(--surface);
+    color:var(--text); font-family:'JetBrains Mono',monospace;
+    font-size:14px; font-weight:700; text-align:center; outline:none;
+    transition:var(--transition);
+  }
+  .group-footer input[type="number"]:focus { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-glow); }
+  .group-footer .pick-info { font-size:12px; color:var(--text-muted); margin-left:auto; }
+
+  /* Draw Button */
+  .draw-section { margin:32px 0; text-align:center; }
+  .btn-draw {
+    width:100%; max-width:480px; padding:22px 36px; border-radius:var(--radius);
+    border:none; font-family:'Outfit','Noto Sans KR',sans-serif;
+    font-size:18px; font-weight:700; cursor:pointer; color:white;
+    overflow:hidden; transition:all 0.3s; position:relative;
+    background:linear-gradient(135deg, var(--accent), #5b4cd4);
+    box-shadow:0 6px 30px var(--accent-glow); letter-spacing:0.3px;
+  }
+  .btn-draw::after {
+    content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    transition:left 0.6s;
+  }
+  .btn-draw:hover:not(:disabled)::after { left:100%; }
+  .btn-draw:hover:not(:disabled) { transform:translateY(-3px); box-shadow:0 10px 40px var(--accent-glow-strong); }
+  .btn-draw:active:not(:disabled) { transform:scale(0.98); }
+  .btn-draw:disabled { opacity:0.35; cursor:not-allowed; }
+  .btn-draw.spinning {
+    background:linear-gradient(135deg, var(--warning), #e09800);
+    box-shadow:0 6px 30px rgba(240,180,41,0.3);
+    animation:drawPulse 0.5s ease-in-out infinite;
+  }
+  @keyframes drawPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.01)} }
+
+  /* Modal */
+  .modal-backdrop {
+    position:fixed; inset:0; z-index:2000;
+    background:rgba(8,8,12,0.82); backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-backdrop.active { display:flex; }
+  .modal {
+    background:var(--surface); border:1px solid var(--border-light);
+    border-radius:var(--radius); width:100%; max-width:440px; overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    animation:modalIn 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+  @keyframes modalIn {
+    from { opacity:0; transform:scale(0.92) translateY(12px); }
+    to { opacity:1; transform:scale(1) translateY(0); }
+  }
+  .modal-header {
+    padding:18px 20px 14px; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border);
+  }
+  .modal-header h3 { font-size:16px; font-weight:700; }
+  .modal-close {
+    width:30px; height:30px; border-radius:8px; border:none;
+    background:transparent; color:var(--text-muted); cursor:pointer;
+    font-size:16px; display:flex; align-items:center; justify-content:center;
+    transition:var(--transition);
+  }
+  .modal-close:hover { background:var(--surface-2); color:var(--text); }
+  .modal-body { padding:16px 20px; }
+  .modal-body textarea {
+    width:100%; height:150px; padding:14px; border-radius:var(--radius-sm);
+    border:1px solid var(--border); background:var(--bg);
+    color:var(--text); font-family:inherit; font-size:14px; line-height:1.8;
+    outline:none; resize:vertical; transition:var(--transition);
+  }
+  .modal-body textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
+  .modal-body textarea::placeholder { color:var(--text-muted); }
+  .modal-hint {
+    font-size:12px; color:var(--text-muted); margin-top:8px; line-height:1.5;
+  }
+  .modal-hint code {
+    background:var(--surface-2); padding:1px 5px; border-radius:4px;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+  }
+  .modal-preview { margin-top:14px; }
+  .modal-preview-label {
+    font-size:12px; font-weight:700; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;
+  }
+  .modal-preview-chips {
+    display:flex; flex-wrap:wrap; gap:6px; min-height:30px;
+    padding:10px; border-radius:8px; background:var(--bg); border:1px solid var(--border);
+  }
+  .preview-chip {
+    padding:4px 10px; border-radius:12px; font-size:12px; font-weight:600;
+    background:rgba(124,106,239,0.12); color:var(--accent-light); border:1px solid rgba(124,106,239,0.25);
+  }
+  .preview-empty { font-size:12px; color:var(--text-muted); font-style:italic; }
+  .preview-count {
+    font-size:12px; color:var(--success); font-weight:700;
+    margin-top:6px;
+  }
+  .modal-footer {
+    padding:14px 20px; border-top:1px solid var(--border);
+    display:flex; justify-content:flex-end; gap:8px; background:rgba(0,0,0,0.1);
+  }
+  .modal-footer .btn { padding:10px 20px; font-size:13px; }
+
+  /* Shuffle Overlay */
+  .shuffle-overlay {
+    position:fixed; inset:0; z-index:1000;
+    background:rgba(8,8,12,0.88); backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:32px;
+  }
+  .shuffle-overlay.active { display:flex; }
+  .shuffle-label {
+    font-size:14px; color:var(--text-dim); text-transform:uppercase;
+    letter-spacing:4px; font-weight:600; animation:blink 1s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .shuffle-slots { display:flex; flex-direction:column; gap:18px; align-items:center; }
+  .shuffle-group-row { display:flex; align-items:center; gap:16px; min-width:320px; }
+  .shuffle-group-label {
+    font-size:14px; font-weight:700; width:110px; text-align:right;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .shuffle-group-value {
+    font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700;
+    color:var(--gold); min-width:200px; text-align:center;
+    text-shadow:0 0 20px rgba(255,209,102,0.25);
+    padding:10px 16px; background:rgba(255,209,102,0.05);
+    border-radius:10px; border:1px solid rgba(255,209,102,0.1); transition:all 0.3s;
+  }
+
+  /* Results */
+  .results-section { display:none; margin-top:8px; }
+  .results-section.show { display:block; animation:resultsIn 0.6s cubic-bezier(0.16,1,0.3,1); }
+  @keyframes resultsIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .result-card {
+    background:var(--surface); border-radius:var(--radius);
+    border:1px solid var(--border); margin-bottom:14px; overflow:hidden;
+    animation:resultCardIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+  }
+  .result-card:nth-child(2){animation-delay:.12s}
+  .result-card:nth-child(3){animation-delay:.24s}
+  .result-card:nth-child(4){animation-delay:.36s}
+  @keyframes resultCardIn {
+    from{opacity:0;transform:translateY(24px) scale(0.96)}
+    to{opacity:1;transform:translateY(0) scale(1)}
+  }
+  .result-card-header {
+    padding:14px 18px; display:flex; align-items:center; gap:10px;
+    border-bottom:1px solid var(--border); background:rgba(0,0,0,0.1);
+  }
+  .result-group-dot { width:12px; height:12px; border-radius:4px; flex-shrink:0; }
+  .result-group-name { font-size:14px; font-weight:700; color:var(--text-dim); }
+  .result-pick-info { margin-left:auto; font-size:12px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+  .result-card-body {
+    padding:20px 18px; display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
+  }
+  .winner-badge {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:12px 22px; border-radius:14px; font-size:18px; font-weight:900;
+    animation:winnerPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    position:relative; overflow:hidden;
+  }
+  .winner-badge::before {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(135deg, rgba(255,255,255,0.08), transparent);
+    pointer-events:none;
+  }
+  .winner-badge:nth-child(1){animation-delay:.2s}
+  .winner-badge:nth-child(2){animation-delay:.35s}
+  .winner-badge:nth-child(3){animation-delay:.5s}
+  .winner-badge:nth-child(4){animation-delay:.65s}
+  .winner-badge:nth-child(5){animation-delay:.8s}
+  @keyframes winnerPop {
+    from{opacity:0;transform:scale(0.3) rotateZ(-8deg)}
+    60%{transform:scale(1.08) rotateZ(2deg)}
+    to{opacity:1;transform:scale(1) rotateZ(0deg)}
+  }
+  .winner-badge .crown { font-size:16px; }
+
+  /* History */
+  .history-section { margin-top:24px; display:none; }
+  .history-section.show { display:block; }
+  .history-item {
+    background:var(--surface); border-radius:var(--radius-sm);
+    border:1px solid var(--border); padding:14px 16px; margin-bottom:8px;
+  }
+  .history-meta { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .history-time { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted); }
+  .history-round {
+    font-size:11px; color:var(--accent); font-weight:700;
+    background:rgba(124,106,239,0.1); padding:2px 8px; border-radius:4px;
+  }
+  .history-groups { display:flex; flex-wrap:wrap; gap:6px; }
+  .history-group-tag { font-size:12px; padding:4px 10px; border-radius:6px; font-weight:600; }
+  .history-winners { font-weight:700; }
+  .btn-clear-history { margin-top:8px; }
+
+  @media (max-width:500px) {
+    .groups-grid { grid-template-columns:1fr; }
+    .header h1 { font-size:26px; }
+    .shuffle-group-row { min-width:auto; flex-direction:column; gap:4px; }
+    .shuffle-group-label { width:auto; text-align:center; }
+    .shuffle-group-value { min-width:160px; font-size:18px; }
+    .winner-badge { font-size:15px; padding:10px 16px; }
+    .group-creator { flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+<canvas id="confettiCanvas"></canvas>
+
+<!-- Shuffle Overlay -->
+<div class="shuffle-overlay" id="shuffleOverlay">
+  <div class="shuffle-label">추첨 중...</div>
+  <div class="shuffle-slots" id="shuffleSlots"></div>
+</div>
+
+<!-- Bulk Add Modal -->
+<div class="modal-backdrop" id="bulkModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="bulkModalTitle">📋 여러명 한번에 추가</h3>
+      <button class="modal-close" onclick="closeBulkModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="bulkTextarea"
+        placeholder="한 줄에 한 명씩 입력하세요.
+
+김철수
+이영희
+박민수
+
+또는 쉼표로 구분: 김철수, 이영희, 박민수"
+        oninput="updateBulkPreview()"></textarea>
+      <div class="modal-hint">
+        한 줄에 한 명, 또는 <code>,</code> <code>/</code> 로 구분하여 입력할 수 있습니다.
+      </div>
+      <div class="modal-preview">
+        <div class="modal-preview-label">미리보기</div>
+        <div class="modal-preview-chips" id="bulkPreviewChips">
+          <span class="preview-empty">이름을 입력하면 여기에 표시됩니다</span>
+        </div>
+        <div class="preview-count" id="bulkPreviewCount"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeBulkModal()">취소</button>
+      <button class="btn btn-primary" id="bulkConfirmBtn" onclick="confirmBulkAdd()" disabled>추가하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app">
+  <div class="header">
+    <div class="header-icon">🎲</div>
+    <h1>Group Random Picker</h1>
+    <p>그룹별 랜덤 추첨 시스템</p>
+  </div>
+
+  <div class="section-title">그룹 만들기</div>
+  <div class="group-creator">
+    <input type="text" id="groupNameInput" placeholder="새 그룹 이름 입력 (예: 개발팀, A조 ...)" onkeydown="if(event.key==='Enter')createGroup()">
+    <button class="btn btn-primary" onclick="createGroup()">+ 그룹 생성</button>
+  </div>
+
+  <div class="section-title" id="groupsSectionTitle" style="display:none">그룹 목록</div>
+  <div class="groups-grid" id="groupsGrid">
+    <div class="empty-state">
+      <div class="icon">📋</div>
+      <div class="title">아직 그룹이 없습니다</div>
+      <div class="sub">위에서 그룹을 만들어 시작하세요!</div>
+    </div>
+  </div>
+
+  <div class="draw-section">
+    <button class="btn-draw" id="drawBtn" onclick="startDraw()" disabled>🎲 그룹을 먼저 만들어주세요</button>
+  </div>
+
+  <div class="results-section" id="resultsSection">
+    <div class="section-title">🎉 추첨 결과</div>
+    <div id="resultsContainer"></div>
+  </div>
+
+  <div class="history-section" id="historySection">
+    <div class="section-title">📜 추첨 기록</div>
+    <div id="historyContainer"></div>
+    <button class="btn btn-danger-ghost btn-clear-history" onclick="clearHistory()">🗑 기록 초기화</button>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let groups = [];
+let drawHistory = [];
+let roundCount = 0;
+let isDrawing = false;
+let bulkTargetGroupId = null;
+
+// ── LocalStorage 자동 저장/복원 ──
+var STORAGE_KEY = 'groupRandomPicker';
+
+function saveToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      groups: groups,
+      drawHistory: drawHistory,
+      roundCount: roundCount
+    }));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    var data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (data) {
+      groups = data.groups || [];
+      drawHistory = data.drawHistory || [];
+      roundCount = data.roundCount || 0;
+    }
+  } catch(e) {}
+}
+
+const COLORS = [
+  { bg:'rgba(124,106,239,0.15)', border:'rgba(124,106,239,0.35)', text:'#9585f5', dot:'#7c6aef' },
+  { bg:'rgba(34,211,167,0.12)', border:'rgba(34,211,167,0.3)', text:'#22d3a7', dot:'#22d3a7' },
+  { bg:'rgba(244,114,182,0.12)', border:'rgba(244,114,182,0.3)', text:'#f472b6', dot:'#f472b6' },
+  { bg:'rgba(34,211,238,0.12)', border:'rgba(34,211,238,0.3)', text:'#22d3ee', dot:'#22d3ee' },
+  { bg:'rgba(255,209,102,0.12)', border:'rgba(255,209,102,0.3)', text:'#ffd166', dot:'#ffd166' },
+  { bg:'rgba(239,106,106,0.12)', border:'rgba(239,106,106,0.3)', text:'#ef6a6a', dot:'#ef6a6a' },
+  { bg:'rgba(167,139,250,0.12)', border:'rgba(167,139,250,0.3)', text:'#a78bfa', dot:'#a78bfa' },
+  { bg:'rgba(52,211,153,0.12)', border:'rgba(52,211,153,0.3)', text:'#34d399', dot:'#34d399' },
+];
+
+// ── Group CRUD ──
+function createGroup() {
+  const input = document.getElementById('groupNameInput');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+  groups.push({ id: Date.now(), name, members: [], pickCount: 1, colorIdx: groups.length % COLORS.length });
+  input.value = '';
+  input.focus();
+  render();
+}
+
+function deleteGroup(id) {
+  if (!confirm('이 그룹을 삭제하시겠습니까?')) return;
+  groups = groups.filter(g => g.id !== id);
+  render();
+}
+
+function addMember(gid) {
+  const input = document.getElementById('mi_' + gid);
+  const name = input.value.trim();
+  if (!name) return;
+  const g = groups.find(x => x.id === gid);
+  if (g) { g.members.push(name); input.value = ''; input.focus(); render(); }
+}
+
+function removeMember(gid, idx) {
+  const g = groups.find(x => x.id === gid);
+  if (g) { g.members.splice(idx, 1); render(); }
+}
+
+function updatePickCount(gid, val) {
+  const g = groups.find(x => x.id === gid);
+  if (g) g.pickCount = Math.max(1, parseInt(val) || 1);
+  updateDrawBtn();
+}
+
+// ── Bulk Add Modal ──
+function openBulkModal(gid) {
+  const g = groups.find(x => x.id === gid);
+  if (!g) return;
+  bulkTargetGroupId = gid;
+  document.getElementById('bulkModalTitle').textContent = '📋 "' + g.name + '" 멤버 한번에 추가';
+  document.getElementById('bulkTextarea').value = '';
+  document.getElementById('bulkConfirmBtn').disabled = true;
+  document.getElementById('bulkPreviewChips').innerHTML = '<span class="preview-empty">이름을 입력하면 여기에 표시됩니다</span>';
+  document.getElementById('bulkPreviewCount').textContent = '';
+  document.getElementById('bulkModal').classList.add('active');
+  setTimeout(function() { document.getElementById('bulkTextarea').focus(); }, 150);
+}
+
+function closeBulkModal() {
+  document.getElementById('bulkModal').classList.remove('active');
+  bulkTargetGroupId = null;
+}
+
+function parseBulkNames(text) {
+  return text.split(/[,\/\n]/).map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });
+}
+
+function updateBulkPreview() {
+  var text = document.getElementById('bulkTextarea').value;
+  var names = parseBulkNames(text);
+  var container = document.getElementById('bulkPreviewChips');
+  var countEl = document.getElementById('bulkPreviewCount');
+  var confirmBtn = document.getElementById('bulkConfirmBtn');
+
+  if (names.length === 0) {
+    container.innerHTML = '<span class="preview-empty">이름을 입력하면 여기에 표시됩니다</span>';
+    countEl.textContent = '';
+    confirmBtn.disabled = true;
+  } else {
+    container.innerHTML = names.map(function(n) {
+      return '<span class="preview-chip">' + esc(n) + '</span>';
+    }).join('');
+    countEl.textContent = '총 ' + names.length + '명이 추가됩니다';
+    confirmBtn.disabled = false;
+  }
+}
+
+function confirmBulkAdd() {
+  if (!bulkTargetGroupId) return;
+  var text = document.getElementById('bulkTextarea').value;
+  var names = parseBulkNames(text);
+  if (names.length === 0) { closeBulkModal(); return; }
+
+  var g = groups.find(function(x) { return x.id === bulkTargetGroupId; });
+  if (g) {
+    g.members = g.members.concat(names);
+    render();
+  }
+  closeBulkModal();
+}
+
+// Close modal on backdrop click or Escape
+document.getElementById('bulkModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBulkModal();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeBulkModal();
+});
+
+// ── Render ──
+function render() {
+  var grid = document.getElementById('groupsGrid');
+  var title = document.getElementById('groupsSectionTitle');
+
+  if (groups.length === 0) {
+    title.style.display = 'none';
+    grid.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div class="title">아직 그룹이 없습니다</div><div class="sub">위에서 그룹을 만들어 시작하세요!</div></div>';
+  } else {
+    title.style.display = 'flex';
+    grid.innerHTML = groups.map(renderCard).join('');
+  }
+  updateDrawBtn();
+  saveToStorage();
+}
+
+function renderCard(g) {
+  var c = COLORS[g.colorIdx];
+  var chips = g.members.length === 0
+    ? '<div class="members-empty">멤버를 추가해주세요</div>'
+    : g.members.map(function(m, i) {
+        return '<span class="member-chip" style="background:'+c.bg+';border:1px solid '+c.border+';color:'+c.text+'">'+esc(m)+'<button class="remove" onclick="removeMember('+g.id+','+i+')">×</button></span>';
+      }).join('');
+
+  var actualPick = Math.min(g.pickCount, g.members.length);
+  var pickLabel = g.members.length > 0 ? (g.members.length+'명 중 '+actualPick+'명') : '멤버 추가 필요';
+
+  return '<div class="group-card">'
+    + '<div class="group-header">'
+    +   '<div class="group-color" style="background:'+c.dot+'"></div>'
+    +   '<div class="group-name">'+esc(g.name)+'</div>'
+    +   '<div class="group-member-count">'+g.members.length+'명</div>'
+    +   '<button class="group-delete" onclick="deleteGroup('+g.id+')" title="그룹 삭제">✕</button>'
+    + '</div>'
+    + '<div class="group-body">'
+    +   '<div class="member-input-row">'
+    +     '<input type="text" id="mi_'+g.id+'" placeholder="멤버 이름 입력" onkeydown="if(event.key===\'Enter\')addMember('+g.id+')">'
+    +     '<button class="btn-add-member" onclick="addMember('+g.id+')">추가</button>'
+    +   '</div>'
+    +   '<div class="quick-add-row">'
+    +     '<button class="quick-add-btn" onclick="openBulkModal('+g.id+')">📋 여러명 한번에 추가</button>'
+    +   '</div>'
+    +   '<div class="members-list">'+chips+'</div>'
+    + '</div>'
+    + '<div class="group-footer">'
+    +   '<label>🎯 뽑을 인원</label>'
+    +   '<input type="number" value="'+g.pickCount+'" min="1" max="'+Math.max(g.members.length,1)+'" onchange="updatePickCount('+g.id+',this.value)" onfocus="this.select()">'
+    +   '<div class="pick-info">'+pickLabel+'</div>'
+    + '</div>'
+    + '</div>';
+}
+
+function updateDrawBtn() {
+  var btn = document.getElementById('drawBtn');
+  var valid = groups.length > 0 && groups.every(function(g) { return g.members.length > 0 && g.members.length >= g.pickCount; });
+  btn.disabled = !valid;
+
+  if (groups.length === 0) btn.textContent = '🎲 그룹을 먼저 만들어주세요';
+  else if (!valid) btn.textContent = '🎲 각 그룹에 충분한 멤버를 추가하세요';
+  else {
+    var total = groups.reduce(function(s,g){ return s + Math.min(g.pickCount, g.members.length); }, 0);
+    btn.textContent = '🎲 전체 ' + groups.length + '개 그룹에서 ' + total + '명 뽑기!';
+  }
+}
+
+// ── Draw ──
+async function startDraw() {
+  if (isDrawing) return;
+  isDrawing = true;
+
+  var btn = document.getElementById('drawBtn');
+  btn.classList.add('spinning');
+  btn.textContent = '🎰 추첨 중...';
+
+  var results = groups.map(function(g) {
+    var shuffled = g.members.slice().sort(function(){ return Math.random()-0.5; });
+    return { group: g, winners: shuffled.slice(0, Math.min(g.pickCount, g.members.length)) };
+  });
+
+  // Shuffle overlay
+  var overlay = document.getElementById('shuffleOverlay');
+  var slots = document.getElementById('shuffleSlots');
+  overlay.classList.add('active');
+
+  slots.innerHTML = results.map(function(r) {
+    var c = COLORS[r.group.colorIdx];
+    return '<div class="shuffle-group-row">'
+      + '<div class="shuffle-group-label" style="color:'+c.text+'">'+esc(r.group.name)+'</div>'
+      + '<div class="shuffle-group-value" id="sv_'+r.group.id+'">···</div>'
+      + '</div>';
+  }).join('');
+
+  // Animate
+  var dur = 2400;
+  var start = Date.now();
+  await new Promise(function(resolve) {
+    var iv = setInterval(function() {
+      var elapsed = Date.now() - start;
+      if (elapsed >= dur) { clearInterval(iv); resolve(); return; }
+      var progress = elapsed / dur;
+      results.forEach(function(r) {
+        var el = document.getElementById('sv_' + r.group.id);
+        if (!el) return;
+        if (Math.random() > progress * 0.6) {
+          var picks = [];
+          for (var i = 0; i < r.winners.length; i++)
+            picks.push(r.group.members[Math.floor(Math.random() * r.group.members.length)]);
+          el.textContent = picks.join(', ');
+        }
+      });
+    }, 65);
+  });
+
+  // Show final
+  results.forEach(function(r) {
+    var el = document.getElementById('sv_' + r.group.id);
+    if (el) {
+      el.textContent = r.winners.join(', ');
+      el.style.color = '#22d3a7';
+      el.style.borderColor = 'rgba(34,211,167,0.3)';
+      el.style.background = 'rgba(34,211,167,0.08)';
+      el.style.textShadow = '0 0 25px rgba(34,211,167,0.35)';
+    }
+  });
+
+  await sleep(800);
+  overlay.classList.remove('active');
+
+  showResults(results);
+  fireConfetti(); setTimeout(fireConfetti, 500); setTimeout(fireConfetti, 1100);
+
+  // History
+  roundCount++;
+  var now = new Date();
+  var time = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  drawHistory.unshift({
+    round: roundCount, time: time,
+    results: results.map(function(r){ return { name:r.group.name, colorIdx:r.group.colorIdx, winners:r.winners.slice() }; })
+  });
+  renderHistory();
+  saveToStorage();
+
+  btn.classList.remove('spinning');
+  updateDrawBtn();
+  isDrawing = false;
+}
+
+function showResults(results) {
+  var section = document.getElementById('resultsSection');
+  var container = document.getElementById('resultsContainer');
+
+  container.innerHTML = results.map(function(r) {
+    var c = COLORS[r.group.colorIdx];
+    return '<div class="result-card">'
+      + '<div class="result-card-header">'
+      +   '<div class="result-group-dot" style="background:'+c.dot+'"></div>'
+      +   '<div class="result-group-name">'+esc(r.group.name)+'</div>'
+      +   '<div class="result-pick-info">'+r.group.members.length+'명 → '+r.winners.length+'명 당첨</div>'
+      + '</div>'
+      + '<div class="result-card-body">'
+      +   r.winners.map(function(w,i){
+            return '<div class="winner-badge" style="background:'+c.bg+';border:2px solid '+c.border+';color:'+c.text+'">'
+              + '<span class="crown">'+(i===0?'👑':'🎉')+'</span>'+esc(w)+'</div>';
+          }).join('')
+      + '</div></div>';
+  }).join('');
+
+  section.classList.add('show');
+  setTimeout(function(){ section.scrollIntoView({behavior:'smooth',block:'start'}); }, 300);
+}
+
+// ── History ──
+function renderHistory() {
+  var section = document.getElementById('historySection');
+  var container = document.getElementById('historyContainer');
+  if (drawHistory.length === 0) { section.classList.remove('show'); return; }
+  section.classList.add('show');
+
+  container.innerHTML = drawHistory.slice(0,20).map(function(h) {
+    return '<div class="history-item">'
+      + '<div class="history-meta"><span class="history-round">#'+h.round+'</span><span class="history-time">'+h.time+'</span></div>'
+      + '<div class="history-groups">'
+      +   h.results.map(function(r){
+            var c = COLORS[r.colorIdx];
+            return '<span class="history-group-tag" style="background:'+c.bg+';color:'+c.text+'">'
+              + esc(r.name)+': <span class="history-winners">'+r.winners.map(esc).join(', ')+'</span></span>';
+          }).join('')
+      + '</div></div>';
+  }).join('');
+}
+
+function clearHistory() {
+  drawHistory = [];
+  roundCount = 0;
+  renderHistory();
+  saveToStorage();
+  document.getElementById('resultsSection').classList.remove('show');
+}
+
+// ── Confetti ──
+function fireConfetti() {
+  var canvas = document.getElementById('confettiCanvas');
+  var ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  var particles = [];
+  var cols = ['#7c6aef','#22d3a7','#ffd166','#f472b6','#22d3ee','#ef6a6a','#a78bfa','#34d399'];
+  var bursts = [
+    {x:canvas.width*0.2, y:canvas.height*0.45},
+    {x:canvas.width*0.5, y:canvas.height*0.35},
+    {x:canvas.width*0.75, y:canvas.height*0.45}
+  ];
+
+  bursts.forEach(function(bp) {
+    for (var i = 0; i < 45; i++) {
+      var angle = Math.random()*Math.PI*2;
+      var speed = Math.random()*13+5;
+      particles.push({
+        x:bp.x+(Math.random()-0.5)*30, y:bp.y,
+        vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed-7,
+        w:Math.random()*10+4, h:Math.random()*6+3,
+        color:cols[Math.floor(Math.random()*cols.length)],
+        rot:Math.random()*360, rotV:(Math.random()-0.5)*14,
+        grav:0.25+Math.random()*0.15, life:1,
+        decay:0.005+Math.random()*0.008,
+        shape:Math.random()>0.4?'rect':'circle'
+      });
+    }
+  });
+
+  var frame;
+  function anim() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    var alive = false;
+    particles.forEach(function(p) {
+      if (p.life<=0) return;
+      alive = true;
+      p.x+=p.vx; p.vy+=p.grav; p.y+=p.vy;
+      p.rot+=p.rotV; p.life-=p.decay; p.vx*=0.99;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot*Math.PI/180);
+      ctx.globalAlpha=Math.max(0,p.life);
+      ctx.fillStyle=p.color;
+      if(p.shape==='rect') ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      else { ctx.beginPath(); ctx.arc(0,0,p.w/2,0,Math.PI*2); ctx.fill(); }
+      ctx.restore();
+    });
+    if(alive) frame=requestAnimationFrame(anim);
+    else ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+  if(frame) cancelAnimationFrame(frame);
+  anim();
+}
+
+// ── Utils ──
+function esc(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function sleep(ms) { return new Promise(function(r){setTimeout(r,ms)}); }
+function pad(n) { return String(n).padStart(2,'0'); }
+window.addEventListener('resize', function(){
+  var c=document.getElementById('confettiCanvas');
+  c.width=window.innerWidth; c.height=window.innerHeight;
+});
+
+loadFromStorage();
+render();
+renderHistory();
+</script>
+</body>
+</html>
